@@ -1,0 +1,74 @@
+version: '3.7'
+
+services:
+    app:
+        build:
+            context: .
+            dockerfile: .docker/Dockerfile
+        image: 'shouts.dev/laravel'
+        container_name: shouts-laravel-app
+        ports:
+            - "80:80"
+        volumes:
+            - ./src:/var/www/html
+        networks:
+            - laravel-shouts
+        depends_on:
+            - mysql
+    mysql:
+        image: 'mariadb:latest'
+        container_name: shouts-laravel-db
+        restart: unless-stopped
+        ports:
+            - "3306:3306"
+        environment:
+            MYSQL_DATABASE: laravel
+            MYSQL_ROOT_PASSWORD:
+            MYSQL_PASSWORD:
+            MYSQL_USER: root
+            MYSQL_ALLOW_EMPTY_PASSWORD: 'yes'
+        volumes:
+            - ./database/dbdata:/var/lib/mysql
+        networks:
+            - laravel-shouts
+    composer:
+        build:
+            context: .
+            dockerfile: .docker/composer/Dockerfile
+        container_name: composer
+        volumes:
+            - ./source:/var/www/html
+        working_dir: /var/www/html
+        depends_on:
+            - app
+        user: laravel
+        networks:
+            - laravel-shouts
+        entrypoint: ['composer', '--ignore-platform-reqs']
+
+    npm:
+        image: node:18.2.0
+        container_name: npm
+        volumes:
+            - ./source:/var/www/html
+        working_dir: /var/www/html
+        entrypoint: ['npm']
+
+    artisan:
+        build:
+            context: .
+            dockerfile: .docker/php/Dockerfile
+        container_name: artisan
+        volumes:
+            - ./source:/var/www/html:delegated
+        depends_on:
+            - mysql
+        working_dir: /var/www/html
+        user: laravel
+        entrypoint: ['php', '/var/www/html/artisan']
+        networks:
+            - laravel-shouts
+
+networks:
+    laravel-shouts:
+        driver: bridge
